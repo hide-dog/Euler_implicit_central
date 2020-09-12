@@ -1,8 +1,6 @@
 # Euler_implicit_central
 
-999_3s_scatter_kakunin.py：厳密解と解析解の比較を行うコード 
-
-sod,t=2.csv：2sにおけるsodの衝撃波の結果
+sod,t=0.2.csv：0.2sにおけるsodの衝撃波の結果
 
 FVM(FVS,muscl)_in_LDU.jl：juliaの解析コード
 
