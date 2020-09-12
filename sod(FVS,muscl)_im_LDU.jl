@@ -1,8 +1,11 @@
 using Printf
 
 # --------------------------
-# -- function             --
+# -- function setup       --
 # --------------------------
+#
+# 基本量と保存量の設定
+#
 function setup(nx,dx,gamma)
     u   = zeros(nx)               # 速度
     rho = zeros(nx)               # 密度
@@ -46,6 +49,12 @@ function setup(nx,dx,gamma)
     return x,qf,Qc
 end
 
+# --------------------------
+# -- function boundary    --
+# --------------------------
+#
+# 境界条件の設定
+#
 function boundary(nx,gamma,qf,Qc,bdcon)
     if Int(bdcon[1][1]) == 0
         for i in 1:3
@@ -78,9 +87,13 @@ function boundary(nx,gamma,qf,Qc,bdcon)
     return Qc
 end
         
-
-function GS(Qc,qf,nx,dx,dt,RHS,yacobiA,norm_ok)   # ガウスザイデル法
-###################################################
+# --------------------------
+# -- function GS          --
+# --------------------------
+#
+# gauss-seidel法
+#
+function GS(Qc,qf,nx,dx,dt,RHS,yacobiA,norm_ok)
     delta_Q = zeros(nx,3)
     delta_Q2 = zeros(nx,3)
     delta_Q_temp = zeros(nx,3)
@@ -94,9 +107,10 @@ function GS(Qc,qf,nx,dx,dt,RHS,yacobiA,norm_ok)   # ガウスザイデル法
 
     ite=0
     con=0
-    while con == 0
+    while con == 0　# gs iteration
         delta_Q_temp = copy(delta_Q)
 
+        # LDU分解
         L = zeros(nx,3)
         D = zeros(nx)
         U = zeros(nx,3)
@@ -139,7 +153,8 @@ function GS(Qc,qf,nx,dx,dt,RHS,yacobiA,norm_ok)   # ガウスザイデル法
                 delta_Q[i,j] = delta_Q[i,j] - U[i+1,j]/ D[i]
             end
         end
-
+        
+        # 収束判定
         if (ite+1) % 100 == 0
             sum_b_Ax = zeros(3)
 
@@ -155,8 +170,6 @@ function GS(Qc,qf,nx,dx,dt,RHS,yacobiA,norm_ok)   # ガウスザイデル法
                 norm2d[i] = sum_b_Ax[i]/sum_b[i]
             end
 
-            #print(norm2d)
-
             if norm2d[1] < norm_ok && norm2d[2] < norm_ok && norm2d[3] < norm_ok
                 con=1
             end
@@ -168,8 +181,8 @@ function GS(Qc,qf,nx,dx,dt,RHS,yacobiA,norm_ok)   # ガウスザイデル法
             throw(UndefVarError(:x))
         end
     end
-
-
+    
+    # Qcの更新
     for i in 2:nx-1
         for j in 1:3
             Qc[i,j] = Qc[i,j]+delta_Q[i,j]
@@ -178,7 +191,13 @@ function GS(Qc,qf,nx,dx,dt,RHS,yacobiA,norm_ok)   # ガウスザイデル法
     return Qc
 end
 
-
+# --------------------------
+# -- function cal_RHS     --
+# --------------------------
+#
+# 右辺の計算
+# RHSを定義
+#
 function cal_RHS(Fplus,nx)  # 境界フラックスの計算
 
     RHS = zeros(nx,3)
@@ -191,7 +210,13 @@ function cal_RHS(Fplus,nx)  # 境界フラックスの計算
     return RHS
 end
 
-
+# --------------------------
+# -- function fvs         --
+# --------------------------
+#
+# Flux Vector Splitting method 
+# Fplusを定義
+#
 function fvs(QcL,QcR,qfL,qfR,nx,gamma)  # FVS法によるフラックスの計算(セル1と2の境界をFplus[1]に格納)
 
     Fplus = zeros(nx+1,3)
@@ -232,7 +257,16 @@ function fvs(QcL,QcR,qfL,qfR,nx,gamma)  # FVS法によるフラックスの計�
     return Fplus
 end
 
-
+# --------------------------
+# -- function A_pm       --
+# --------------------------
+#
+# ヤコビアン行列の正負の計算に向け、固有値等を計算
+# A = R^(-1)ΛR としたとき
+# R = R
+# R_inv = R^(-1)
+# Gam = Λ
+#
 function A_pm(H,u,c,b_para,a_para)  # ヤコビアン行列の固有値もろもろ計算
     R     = [1.0 1.0 1.0;
             u-c u u+c;
@@ -246,6 +280,12 @@ function A_pm(H,u,c,b_para,a_para)  # ヤコビアン行列の固有値もろも
     return R, R_inv, Gam, Gam_abs
 end
 
+# --------------------------
+# -- function yacobi_A    --
+# --------------------------
+#
+# ヤコビアン行列の計算
+#
 function yacobi_A(Qc,qf,gamma,nx)
     yacobiA = zeros(nx,4,4)
     
@@ -270,6 +310,12 @@ function yacobi_A(Qc,qf,gamma,nx)
     return yacobiA
 end
 
+# -------------------------------
+# -- function nn_inner_product --
+# -------------------------------
+#
+# n*n行列同士の内積
+#
 function nn_inner_product(a,b)
     temp=zeros(size(a)[1],size(a)[1])
     for i in 1:size(a)[1]
@@ -282,7 +328,12 @@ function nn_inner_product(a,b)
     return temp    
 end
 
-
+# -------------------------------
+# -- function nm_inner_product --
+# -------------------------------
+#
+# n*m行列と1*m行列の内積
+#
 function nm_inner_product(a,b)
     temp = zeros(size(a)[1])
     for i in 1:size(a)[1]
@@ -293,7 +344,12 @@ function nm_inner_product(a,b)
     return temp
 end
 
-
+# -------------------------------
+# -- function muscl            --
+# -------------------------------
+#
+# muscl法による補間
+#
 function muscl(Qc,qf,nx,k_muscl,b_muscl,gamma)
 
     qfL = zeros(nx+1,3)
@@ -337,14 +393,24 @@ function muscl(Qc,qf,nx,k_muscl,b_muscl,gamma)
     return QcL,QcR,qfL,qfR
 end
     
-
+# -------------------------------
+# -- function minmod           --
+# -------------------------------
+#
+# 流速制限関数minmod
+#
 function minmod(x,y,b)
     ans = sign(x)*max(0,min(abs(x),sign(x)*y*b))
     return ans
 end
 
-    
-function qftoQc(qf,nx,gamma)  # 基本量から保存量変換
+# -------------------------------
+# -- function qftoQc           --
+# -------------------------------
+#
+# 基本量から保存量に変換
+#
+function qftoQc(qf,nx,gamma)
     lo_Qc = zeros(nx,3)
     for i in 1:nx
         lo_Qc[i,1] = qf[i,2]
@@ -355,6 +421,12 @@ function qftoQc(qf,nx,gamma)  # 基本量から保存量変換
     return lo_Qc
 end
 
+# -------------------------------
+# -- function Qctoqf           --
+# -------------------------------
+#
+# 保存量から基本量に変換
+#
 function Qctoqf(Qc,nx,gamma)  # 保存量から基本量変換
     lo_qf = zeros(nx,3)
     for i in 1:nx
@@ -365,7 +437,12 @@ function Qctoqf(Qc,nx,gamma)  # 保存量から基本量変換
     return lo_qf
 end
 
-
+# -------------------------------
+# -- function output_q         --
+# -------------------------------
+#
+# x,rho,u,pの出力
+#
 function output_q(x,qf,nx,out_dir,out_file_front,stepnum,out_ext)
     fff = out_dir*"/"*out_file_front*string(stepnum)*out_ext
     open(fff,"w") do f
@@ -380,8 +457,12 @@ function output_q(x,qf,nx,out_dir,out_file_front,stepnum,out_ext)
     end
 end
 
-
-
+# -------------------------------
+# -- function cre_dir          --
+# -------------------------------
+#
+# ディレクトリの作成
+#
 function cre_dir(outdir)
     k = 0
     try rm(outdir,recursive=true)
@@ -396,6 +477,9 @@ function cre_dir(outdir)
 end
 
 
+# -------------------------------
+# -- main                      --
+# -------------------------------
 function main()
     # --------------------------
     # -- initial value        --
@@ -444,9 +528,8 @@ function main()
             [bd2_con, bd2_rho, bd2_u, bd2_p, bd2_T]]
     
     # --------------------------
-    # --         --
+    # -- setup                --
     # --------------------------
-
     cre_dir(dir_name)
     x,qf,Qc = setup(nx,dx,gamma)
 
@@ -459,16 +542,13 @@ function main()
         Fplus = fvs(QcL,QcR,qfL,qfR,nx,gamma) 
         RHS = cal_RHS(Fplus,nx)
 
-
         yacobiA = yacobi_A(Qc,qf,gamma,nx)
-        Qc = GS(Qc,qf,nx,dx,dt,RHS,yacobiA,norm_ok)
-    
+        Qc = GS(Qc,qf,nx,dx,dt,RHS,yacobiA,norm_ok)    
+        
         qf=Qctoqf(Qc,nx,gamma)
 
         stepnum = Int(round(t*dt*1000))
         output_q(x,qf,nx,dir_name,out_name_front,stepnum,out_name_back)
-
-        #throw(UndefVarError(:x))
     end
 end
 

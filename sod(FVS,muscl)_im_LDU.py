@@ -28,9 +28,13 @@ norm_ok=1.0e-4
 dir_name="FVS_muscl_in_LDU" # 出力フォルダ名
 out_name_front="time"                 # 出力ファイル名（先頭）
 out_name_back="d-3"
+
 # --------------------------
-# -- function             --
+# -- function setup       --
 # --------------------------
+#
+# 基本量と保存量の設定
+#
 def setup():  # 初期値入力
     global x, bol, bor, qf, Qc
     u = [0.0]*nx               # 速度
@@ -84,17 +88,25 @@ def setup():  # 初期値入力
                 qf[i][j] = p[i]
                 Qc[i][j] = e[i]
 
-
+# --------------------------
+# -- function cal_Q    --
+# --------------------------
+#
+# 右辺の計算を行い、時間ステップを進める
+#
 def cal_Q():
     global Qc
 
     cal_Res()               # 右辺Rの計算
 
-    
-
     Qc=GS(Qc)
 
-
+# --------------------------
+# -- function bound       --
+# --------------------------
+#
+# 境界条件の設定
+#
 def bound(lQc):  # 境界の計算
     for i in range(3):
         lQc[0][i] = 2*bol[i]-lQc[1][i]  # 左端境界の計算
@@ -102,9 +114,13 @@ def bound(lQc):  # 境界の計算
 
     return lQc
         
-
-def GS(lQc):   # ガウスザイデル法
-###################################################
+# --------------------------
+# -- function GS          --
+# --------------------------
+#
+# gauss-seidel法
+#
+def GS(lQc):
     delta_Q = numpy.array([[0.0] * 3 for i in [1] * nx])
     delta_Q2 = numpy.array([[0.0] * 3 for i in [1] * nx])
     delta_Q_temp = numpy.array([[0.0] * 3 for i in [1] * nx])
@@ -118,9 +134,10 @@ def GS(lQc):   # ガウスザイデル法
 
     ite=0
     con=0
-    while con==0:
+    while con==0: # gs iteration
         delta_Q_temp = copy.deepcopy(delta_Q)
 
+        # LDU分解
         L = numpy.array([[0.0] * 3 for i in [1] * nx])
         D = numpy.array([0.0]*nx)
         U = numpy.array([[0.0] * 3 for i in [1] * nx])
@@ -128,8 +145,6 @@ def GS(lQc):   # ガウスザイデル法
             L[i] = dt*(numpy.dot(yacobiA[i],delta_Q[i]))/2
             D[i] = dx
             U[i] = dt*(numpy.dot(yacobiA[i],delta_Q[i]))/2
-        
-        # jacobi??
 
         
         RHS = numpy.array([[0.0] * 3 for i in [1] * nx])
@@ -145,45 +160,17 @@ def GS(lQc):   # ガウスザイデル法
         for i in range(lbound,nx-lbound):
             delta_Q[i] = delta_Q[i] - U[i+1]/ D[i]
 
-        #print("xxxxxxx")
-
-        #print(delta_Q[2])
-        #print(delta_Q_temp[2])
-            
-
-        #for i in range(lbound,nx-lbound):
-            #delta_Q2[i]=dt/dx*(numpy.dot(yacobiA[i-1],delta_Q2[i-1])-numpy.dot(yacobiA[i+1],delta_Q2[i+1]))/2-dt/dx*lo_R[i]
-
+        # 収束判定
         if (ite+1) % 100 ==0:
             sum_b_Ax=numpy.array([0.0] * 3)
-
-            
-            """
-            for i in range(nx):
-                L[i] = dt*(numpy.dot(yacobiA[i],delta_Q[i]))/2
-                D[i] = dx
-                U[i] = dt*(numpy.dot(yacobiA[i],delta_Q[i]))/2
-            # (D+L)Q=Q
-            for i in range(lbound,nx-lbound):
-                delta_Q_temp[i] = (L[i-1]+RHS[i]) / D[i]
-            # (D+U)Q=DQ
-            for i in range(lbound,nx-lbound):
-                delta_Q_temp[i] = delta_Q_temp[i] - U[i+1]/ D[i]
-            """
                 
-
             for i in range(lbound,nx-lbound):
                 for j in range(3):
-                    #sum_b_Ax += abs(-delta_Q[i]+dt/dx*(numpy.dot(yacobiA[i-1],delta_Q[i-1])-numpy.dot(yacobiA[i+1],delta_Q[i+1]))/2-dt/dx*lo_R[i])
                     sum_b_Ax += abs(delta_Q[i]-delta_Q_temp[i])
             
-
             norm2d=[0.0] * 3
-
             for i in range(3):
                 norm2d[i]=sum_b_Ax[i]/sum_b[i]
-
-            #print(norm2d)
 
             if norm2d[0] < norm_ok and norm2d[1] < norm_ok and norm2d[2] < norm_ok:
                 con=1
@@ -192,6 +179,8 @@ def GS(lQc):   # ガウスザイデル法
 
     delta_Q.tolist()
 
+    
+    # Qcの更新
     for i in range(lbound,nx-lbound):
         for j in range(3):
             lQc[i][j]=lQc[i][j]+delta_Q[i][j]
@@ -201,7 +190,14 @@ def GS(lQc):   # ガウスザイデル法
     return lQc
 
 
-def cal_Res():  # 境界フラックスの計算
+# --------------------------
+# -- function cal_RHS     --
+# --------------------------
+#
+# 右辺の計算
+# RHSを定義
+#
+def cal_Res():
     global Res
 
     Res = numpy.array([[0.0] * 3 for i in [1] * nx])
@@ -215,8 +211,14 @@ def cal_Res():  # 境界フラックスの計算
     
     
 
-
-def fvs():  # FVS法によるフラックスの計算(セル1と2の境界をFplus[1]に格納)
+# --------------------------
+# -- function fvs         --
+# --------------------------
+#
+# Flux Vector Splitting method 
+# Fplusを定義、(セル1と2の境界をFplus[1]に格納)
+#
+def fvs():
     global Fplus
 
     Fplus = [[0.0] * 3 for i in [1] * (nx+1)]
@@ -234,7 +236,17 @@ def fvs():  # FVS法によるフラックスの計算(セル1と2の境界をFpl
         Fplus[i] = 0.5*(numpy.dot(Ap, QcL[i]) + numpy.dot(Am, QcR[i]))   # フラックスを計算
 
 
-def A_pm(lQc,lqf):  # ヤコビアン行列の固有値もろもろ計算
+# --------------------------
+# -- function A_pm       --
+# --------------------------
+#
+# ヤコビアン行列の正負の計算に向け、固有値等を計算
+# A = R^(-1)ΛR としたとき
+# R = R
+# R_inv = R^(-1)
+# Gam = Λ
+#
+def A_pm(lQc,lqf):
     H = (lQc[2]+lqf[2])/lQc[0]  # エンタルピー
     u = lqf[0]
     c = numpy.sqrt((gamma-1)*(H-0.5*u**2))
@@ -251,6 +263,12 @@ def A_pm(lQc,lqf):  # ヤコビアン行列の固有値もろもろ計算
 
     return R, R_inv, Gam, Gam_abs
 
+# --------------------------
+# -- function yacobi_A    --
+# --------------------------
+#
+# ヤコビアン行列の計算
+#
 def yacobi_A():
     global  yacobiA
 
@@ -260,6 +278,13 @@ def yacobi_A():
         R, R_inv, Gam, Gam_abs = A_pm(Qc[i],qf[i])
         yacobiA[i] = numpy.dot((numpy.dot(R, Gam)), R_inv)
 
+
+# -------------------------------
+# -- function muscl            --
+# -------------------------------
+#
+# muscl法による補間
+#
 def muscl():
     global qf,qfL,qfR,QcL,QcR
     # 1と2の間を1に収納
@@ -300,14 +325,23 @@ def muscl():
     QcR[nx-2]=Qc[nx-1][:]
 
     
-    
-
+# -------------------------------
+# -- function minmod           --
+# -------------------------------
+#
+# 流速制限関数minmod
+#
 def minmod(x,y,b):
     ans=numpy.sign(x)*max(0,min(abs(x),numpy.sign(x)*y*b))
         
     return ans
 
-    
+# -------------------------------
+# -- function qftoQc           --
+# -------------------------------
+#
+# 基本量から保存量に変換
+# 
 def qftoQc(qf):  # 基本量から保存量変換
     lo_Qc=[[0.0] * 3 for i in [1] * nx]
     for i in range(nx):
@@ -321,6 +355,12 @@ def qftoQc(qf):  # 基本量から保存量変換
 
     return lo_Qc
 
+# -------------------------------
+# -- function Qctoqf           --
+# -------------------------------
+#
+# 保存量から基本量に変換
+#
 def Qctoqf(Qc):  # 保存量から基本量変換
     lo_qf=[[0.0] * 3 for i in [1] * nx]
     for i in range(nx):
@@ -333,7 +373,12 @@ def Qctoqf(Qc):  # 保存量から基本量変換
                 lo_qf[i][j]=(gamma-1)*(Qc[i][2]-1.0/2.0*Qc[i][0]*((Qc[i][1]/Qc[i][0])**2))
     return lo_qf
 
-    
+# -------------------------------
+# -- function output_q         --
+# -------------------------------
+#
+# x,rho,u,pの出力
+#   
 def output_q(f_name):  # テキスト形式で出力
     outlist=["x[m] u[m/s] rho[kg/m3] p[Pa]"]  # 出力するものの名前
     for i in range(len(qf)):
@@ -343,28 +388,35 @@ def output_q(f_name):  # テキスト形式で出力
     with open(dir_name+"/"+f_name,'wt') as f:
         f.write(outlist)
 
+# -------------------------------
+# -- function cre_dir          --
+# -------------------------------
+#
+# ディレクトリの作成
+#
 def cre_dir():  # フォルダ作成
     try:
         os.mkdir(dir_name)
     except:
         pass
 
+
+############################
+### main                 ###
+############################
+
 # --------------------------
 # -- preparetion          --
 # --------------------------
 cre_dir()
 setup()
-# --------------------------
-# -- main                 --
-# --------------------------
 
 for k in range(nstep):
     
     print(k)
     
-    #raise ValueError("error!")
-
     cal_Q()
     qf=Qctoqf(Qc)
         
-    output_q(out_name_front+'{:0=4}'.format(int(k*dt*1000))+out_name_back)
+    #output_q(out_name_front+'{:0=4}'.format(int(k*dt*1000))+out_name_back)
+    output_q(out_name_front+str(int(k*dt*1000))+out_name_back)
