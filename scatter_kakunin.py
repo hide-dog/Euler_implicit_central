@@ -5,7 +5,7 @@ from matplotlib import pyplot
 s_in = "time200d-3"
 date_1, date_2 ,date_3, date_4 = numpy.loadtxt(s_in, delimiter=' ', skiprows=1, unpack=True)
 
-lst = pandas.read_csv("sod,t=2.csv").values.tolist()  # attension please
+lst = pandas.read_csv("sod,t=0.2.csv").values.tolist()  # attension please
 
 x=[]
 y=[]
