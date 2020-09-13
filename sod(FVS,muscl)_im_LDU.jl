@@ -497,6 +497,9 @@ function main()
     gamma = 1.4                    # 比熱比
 
     # -- boundary --
+    # bd1_con = 0 :流入条件
+    #         = 1 :流出条件
+    #
     # -- x+ right --
     bd1_con = 0
     bd1_rho = 1.00
@@ -514,7 +517,7 @@ function main()
     norm_ok = 1.0e-4               # 収束条件
 
     # -- 出力--
-    dir_name       = "FVS_LDU_jl_out"           # 出力フォルダ名
+    dir_name       = "sod_central_0.002s_jl"           # 出力フォルダ名
     out_name_front = "time"                 # 出力ファイル名（先頭）
     out_name_back  = "d-3"
 
@@ -532,7 +535,10 @@ function main()
     # --------------------------
     cre_dir(dir_name)
     x,qf,Qc = setup(nx,dx,gamma)
-
+    
+    # --------------------------
+    # -- main loop            --
+    # --------------------------
     for t in 1:nstep
         print(t)
 

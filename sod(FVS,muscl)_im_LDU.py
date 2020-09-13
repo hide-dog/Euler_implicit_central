@@ -25,7 +25,7 @@ gamma=1.4                    # 比熱比
 norm_ok=1.0e-4
 
 # -- 出力--
-dir_name="FVS_muscl_in_LDU" # 出力フォルダ名
+dir_name="sod_central_0.002s_py" # 出力フォルダ名
 out_name_front="time"                 # 出力ファイル名（先頭）
 out_name_back="d-3"
 
@@ -97,7 +97,7 @@ def setup():  # 初期値入力
 def cal_Q():
     global Qc
 
-    cal_Res()               # 右辺Rの計算
+    cal_RHS()               # 右辺Rの計算
 
     Qc=GS(Qc)
 
@@ -121,12 +121,13 @@ def bound(lQc):  # 境界の計算
 # gauss-seidel法
 #
 def GS(lQc):
+    global RHS
     delta_Q = numpy.array([[0.0] * 3 for i in [1] * nx])
     delta_Q2 = numpy.array([[0.0] * 3 for i in [1] * nx])
     delta_Q_temp = numpy.array([[0.0] * 3 for i in [1] * nx])
     yacobi_A()
 
-    lo_R=numpy.array(Res)
+    lo_R=numpy.array(RHS)
 
     sum_b=numpy.array([0.0] * 3)
     for i in range(lbound,nx-lbound):
@@ -197,19 +198,16 @@ def GS(lQc):
 # 右辺の計算
 # RHSを定義
 #
-def cal_Res():
-    global Res
+def cal_RHS():
+    global RHS
 
-    Res = numpy.array([[0.0] * 3 for i in [1] * nx])
+    RHS = numpy.array([[0.0] * 3 for i in [1] * nx])
     fvs()                             # FVS法によるフラックスの作成
 
     for i in range(1, nx-1):
-        Res[i] = Fplus[i]-Fplus[i-1]
+        RHS[i] = Fplus[i]-Fplus[i-1]
 
-    Res.tolist()
-
-    
-    
+    RHS.tolist()
 
 # --------------------------
 # -- function fvs         --
@@ -342,7 +340,7 @@ def minmod(x,y,b):
 #
 # 基本量から保存量に変換
 # 
-def qftoQc(qf):  # 基本量から保存量変換
+def qftoQc(qf):
     lo_Qc=[[0.0] * 3 for i in [1] * nx]
     for i in range(nx):
         for j in range(3):
@@ -361,7 +359,7 @@ def qftoQc(qf):  # 基本量から保存量変換
 #
 # 保存量から基本量に変換
 #
-def Qctoqf(Qc):  # 保存量から基本量変換
+def Qctoqf(Qc):
     lo_qf=[[0.0] * 3 for i in [1] * nx]
     for i in range(nx):
         for j in range(3):
@@ -401,9 +399,11 @@ def cre_dir():  # フォルダ作成
         pass
 
 
-############################
-### main                 ###
-############################
+
+
+# --------------------------
+# -- main                 --
+# --------------------------
 
 # --------------------------
 # -- preparetion          --
